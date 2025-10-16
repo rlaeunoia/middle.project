@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blooming Type — Typographic Garden</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --bg:#ffffff;
+    --fg:#111111;
+    --muted:#6b6f76;
+    --fs:12px;          
+    --lh:1.35;           
+    --gap:24px;          
+    --line:#111;        
+    --ui:#111;           
+    --pad:16px;
+  }
+
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:'Noto Sans KR', system-ui, -apple-system, sans-serif;
+    font-size:var(--fs); line-height:var(--lh);
+    overflow:hidden;  /* 스크롤 금지 */
+    letter-spacing:0.01em;
+  }
+
+  /* 4칼럼 그리드: 1 = 컨트롤, 2~4 = 드로잉 */
+  .page{
+    height:100vh;
+    display:grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    grid-template-rows: auto 1fr; /* 상단 얇은 로우 + 본행 */
+    column-gap: var(--gap);
+    padding: var(--pad) calc(var(--pad) + 4px) var(--pad) var(--pad);
+    box-sizing:border-box;
+  }
+
+  .folio{
+    grid-column: 1 / -1;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    letter-spacing:.02em; color:var(--muted);
+    margin-bottom:8px;
+    user-select:none;
+  }
+
+  /* 사이드바(1칼럼) */
+  .sidebar{
+    grid-column: 1 / 2;
+    grid-row: 2 / 3;
+    display:flex; flex-direction:column; gap:12px;
+    min-width:0;
+  }
+
+  .title{ color:var(--fg); letter-spacing:.02em; }
+  .section{ color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+  .thinline{ height:1px; background:var(--ui); opacity:.6; }
+
+  .songs{
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .song-btn{
+    appearance:none; background:transparent; border:none; padding:0; text-align:left;
+    color:var(--fg); cursor:pointer; line-height:1.35;
+  }
+  .song-btn.active{ text-decoration:underline; text-underline-offset:2px; }
+
+  .lyrics{
+    max-height:28vh; overflow:auto;
+    padding-right:4px;
+  }
+  .lyrics::-webkit-scrollbar{ width:4px; }
+  .lyrics::-webkit-scrollbar-thumb{ background:#ccc; }
+
+  .palette{
+    display:grid; grid-template-columns: repeat(10, 14px); gap:8px 8px;
+    margin-top:4px;
+  }
+  .swatch{
+    width:14px; height:14px; border-radius:50%;
+    border:1px solid rgba(0,0,0,.25); cursor:pointer;
+  }
+  .swatch.selected{ outline:1px solid #000; outline-offset:2px; }
+
+  .toolbar{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .btn{
+    appearance:none; background:transparent; border:1px solid var(--ui);
+    padding:4px 8px; cursor:pointer; color:var(--fg);
+  }
+  .btn:hover{ background:#f5f5f5; }
+
+  /* 드로잉 보드(3칼럼)*/
+  .board{
+    grid-column: 2 / -1; grid-row: 2 / 3;
+    position:relative; min-width:0;
+    border-left:1px solid var(--line);
+    padding-left: calc(var(--gap) - 1px);
+  }
+
+  canvas{
+    display:block;
+    width:100%; height:100%;
+    background:transparent;
+  }
+
+  /* 시작 오버레이 */
+  .gate{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.94); color:#111; z-index:5;
+  }
+  .gate .box{ border:1px solid #111; padding:8px 10px; cursor:pointer; user-select:none; }
+
+  /* 하단 갤러리 바*/
+  .gallery-bar{
+    position:absolute; left:0; right:0; bottom:0; height:96px;
+    display:flex; gap:8px; align-items:center;
+    overflow-x:auto; overflow-y:hidden;
+    padding:8px 12px;
+    background:transparent;
+    z-index:4;
+  }
+  .gallery-bar::before{
+    content:""; position:absolute; left:0; right:0; top:0; height:1px;
+    background:var(--line); opacity:.6;
+  }
+  .gallery-bar img.thumb{
+    height:80px; flex:0 0 auto; object-fit:contain; cursor:pointer; user-select:none;
+    image-rendering:-webkit-optimize-contrast;
+  }
+  .gallery-bar::-webkit-scrollbar{ height:6px; }
+  .gallery-bar::-webkit-scrollbar-thumb{ background:#ccc; }
+
+  /* 오른쪽 1칼럼 프리뷰 패널*/
+  .preview{
+    position:absolute; top:0; right:0; bottom:96px;
+    width:33.3333%;
+    min-width:220px;
+    background: var(--bg);
+    border-left:1px solid var(--line);
+    display:none;
+    z-index:3;
+  }
+  .preview.show{ display:block; }
+  .preview-header{
+    height:32px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 10px;
+    border-bottom:1px solid var(--line);
+    user-select:none;
+  }
+  .preview-title{ color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:8px;}
+  .preview-close{
+    appearance:none; background:transparent; border:none; color:var(--fg);
+    font-size:14px; line-height:1; cursor:pointer;
+  }
+  .preview-body{
+    position:absolute; top:32px; bottom:0; left:0; right:0;
+    overflow:auto; padding:8px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .preview-body img{ display:block; max-width:100%; height:auto; }
+
+  /* 정보영역*/
+  .meta{
+    margin-top:6px; border-top:1px solid var(--line); padding-top:6px;
+    display:flex; flex-direction:column; gap:4px; color:var(--muted);
+  }
+  .meta-row{ display:flex; justify-content:space-between; gap:8px; }
+  .meta-label{ color:var(--muted); }
+  .meta-value{ color:var(--fg); text-align:right; }
+  .chips{ display:flex; gap:6px; }
+  .chip{ width:10px; height:10px; border-radius:50%; border:1px solid rgba(0,0,0,.25); }
+
+  /* Replay 영역 */
+  .replay-wrap{ border-top:1px solid var(--line); padding-top:6px; }
+  #replayCanvas{ width:100%; height:180px; background:#fff; border:1px solid var(--line); }
+
+  /* 작은 텍스트 버튼 */
+  .btn-link{
+    appearance:none; background:transparent; border:1px solid var(--ui);
+    padding:2px 6px; cursor:pointer; color:var(--fg);
+  }
+  .btn-link:hover{ background:#f5f5f5; }
+
+  /* === Hand(핀치) 추가: 포인터 점 + 도움말 === */
+  .hand-cursor{
+    position:absolute; left:0; top:0;
+    width:10px; height:10px;
+    border:1px solid var(--fg);
+    border-radius:50%;
+    background:transparent;
+    box-shadow:0 0 0 2px #fff inset;
+    pointer-events:none;
+    transform:translate(-50%, -50%);
+    opacity:0; transition:opacity .15s;
+    z-index:6;
+  }
+  .hand-cursor.show{ opacity:1; }
+
+  .hand-help{
+    color:var(--muted);
+    font-size:var(--fs);
+    line-height:var(--lh);
+  }
+  .hand-help .tips{ margin:6px 0 0 0; padding:0 0 0 12px; }
+  .hand-help .tips li{ margin:2px 0; }
+
+  /* 숨김용 비디오(웹캠) */
+  #handVideo{ position:absolute; left:-99999px; width:0; height:0; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="folio" aria-hidden="true">
+    <div>Blooming Type — Editorial Garden</div>
+    <div>Remind Your Own Flower In Your Life</div>
+  </div>
+
+  <!-- 1칼럼: 조절 스페이스 -->
+  <aside class="sidebar">
+    <div class="title">글의 꽃 / About Our Mind Flower</div>
+    <div class="thinline"></div>
+
+    <div class="section">Songs (6)</div>
+    <div class="songs" id="songList"></div>
+
+    <div class="thinline"></div>
+    <div class="section">Lyrics</div>
+    <div class="lyrics" id="lyricsBox"></div>
+
+    <div class="thinline"></div>
+    <div class="section">Color Palette</div>
+    <div class="palette" id="palette"></div>
+
+    <div class="thinline"></div>
+    <div class="toolbar">
+      <button class="btn" id="saveBtn">Save PNG</button>
+      <button class="btn" id="clearBtn">Clear</button>
+      <button class="btn" id="startBtn">Start</button>
+      <!-- ★ 추가: Hand 토글 버튼 -->
+      <button class="btn" id="handBtn" aria-pressed="false">Hand</button>
+    </div>
+
+    <!-- ★ 추가: Hand 사용법(Hand ON일 때만 표시) -->
+    <div class="thinline"></div>
+    <div id="handHelp" class="hand-help" hidden>
+      <div class="section">Hand Pinch — How to</div>
+      <ul class="tips">
+        <li>엄지+검지를 붙이면 단어가 찍혀요.</li>
+        <li>핀치한 채로 손가락을 움직이면 선처럼 이어져요.</li>
+        <li>색을 바꾸면 그 다음 스탬프부터 새 색이 적용돼요.</li>
+        <li>끄려면 Hand 버튼을 다시 누르세요.</li>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- 3칼럼: 드로잉 보드 -->
+  <section class="board" id="board">
+    <canvas id="canvas"></canvas>
+    <!-- ★ 추가: 레이저 포인터 도트 -->
+    <div id="handCursor" class="hand-cursor" aria-hidden="true"></div>
+
+    <div class="gate" id="gate"><div class="box">CLICK / TAP / KEY — Start To Make My Own Flower</div></div>
+
+    <!-- 저장 썸네일 갤러리 바 -->
+    <div id="gallery" class="gallery-bar" aria-label="Saved drawings"></div>
+
+    <!-- 오른쪽 1칼럼 프리뷰 패널 -->
+    <aside id="preview" class="preview" aria-hidden="true">
+      <div class="preview-header">
+        <div id="previewTitle" class="preview-title">Saved Drawing</div>
+        <button id="previewClose" class="preview-close" aria-label="Close">✕</button>
+      </div>
+      <div class="preview-body">
+        <img id="previewImg" alt="preview">
+
+        <!-- Drawing Specific(정보영역) -->
+        <div class="meta" id="metaBox">
+          <div class="meta-row"><span class="meta-label">Song</span><span class="meta-value" id="mSong">-</span></div>
+          <div class="meta-row"><span class="meta-label">Created</span><span class="meta-value" id="mCreated">-</span></div>
+          <div class="meta-row"><span class="meta-label">Words</span><span class="meta-value" id="mWords">-</span></div>
+          <div class="meta-row"><span class="meta-label">Stamps/min</span><span class="meta-value" id="mSpm">-</span></div>
+          <div class="meta-row" style="align-items:center">
+            <span class="meta-label">Palette</span>
+            <span class="meta-value"><span class="chips" id="mPalette"></span></span>
+          </div>
+        </div>
+
+        <!-- Replay 영역 -->
+        <div class="replay-wrap">
+          <button class="btn-link" id="replayBtn">Replay</button>
+          <canvas id="replayCanvas"></canvas>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+</div>
+
+<!-- 오디오 루프 -->
+<audio id="player" preload="auto" loop playsinline></audio>
+
+<!-- ★ 추가: MediaPipe Hands & Camera utils -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+<script>
+/* ======================= 기존 데이터/상수 유지 ======================= */
+const SONGS = [
+  {
+    id:'IntoBloom',
+    title:'피었습니다.(Into Bloom.) — N.Flying',
+    file:'Inst.mp3',
+    lyrics:[
+      "가로수 밑을 걷다", "저 너머에 있던 날", "알아보던 그 순간",
+      "활짝 뛰어오던", "젊은 날의 너와 나", "그림 같은 풍경과",
+      "내리던 비에 젖어", "내게 피었습니다.", "구름 없이 그림자에 떨어진 방울에",
+      "가려던 길 그마저도", "내게 돌아가라 해",
+      "아무 생각 없이 꺼낸",  "어린 나의 서랍장에 난", "똑같은 모습",
+      "같은 곳에서 사무치게도", "다른 온도가 닿았던 그 순간", "눈물이 활짝 피었습니다.",
+      "떠나가려던 사람", "하나 잡지 못했죠", "내 모습에겐 그저", "너는 볼품업고",
+      "하나둘 떠나가면", "마음 쓸 일 없구나", "이유 없이 넌 내게", "활짝 피었습니다.",
+      "구름 없이 그림자에 떨어진 방울에", "가려던 길 그마저도", "내게 돌아가라 해",
+      "아무 생각 없이 꺼낸",  "어린 나의 서랍장에 난", "똑같은 모습",
+      "같은 곳에서 사무치게도", "다른 온도가 닿았던 그 순간", "눈물이 활짝 피었습니다.",
+      "얼마나 더한 상처를 입게 되면",  "이별이 무뎌질 수 있을까",
+      "부르고 부른다", "안녕 나의 설렘아", "피어나 피어라", "마음의 꽃으로",
+      "아무 생각 없이 꺼낸",  "어린 나의 서랍장에 난", "똑같은 모습",
+      "같은 곳에서 사무치게도", "다른 온도가 닿았던 그 순간", "눈물이 활짝 피었습니다."
+    ]
+  },
+  {
+    id:'FlowerRoad',
+    title:'꽃길(Flower Road) — BIGBANG',
+    file:'bigbang_Inst.mp3',
+    lyrics:[
+      "그땐 참 좋았는데 말이야", "너와 함께할 수만 있다면", "때론 외롭고 슬퍼도 말이야",
+      "너와 같이 할 수만 있다면", "Sing it na na na", "노래해 나나나",
+      "우리 이게 마지막이 아니야", "부디 또 만나요 꽃이 피면", "때론 꽤 별난 일이 많아",
+      "넌 나 같이 못난 놈을 만나", "다시 누군갈 사랑할 수 있을까?",
+      "너 아니라면 그럴 일은 없을 것 같아",  "나 의식 없이 발길 흐름대로 가던 길",
+      "날 화려히 비춰주던 네 빛 한줄기", "그 전율이 느껴지는 예쁜 꽃 길",
+      "그곳에 너로 인해 설수 있던 Roly poly toy",
+      "떠나려거든 보내 드리오리다", "님이 가시는 길에 꽃을 뿌리오리다", "그리워지면 돌아와 줘요", "그때 또 다시 날 사랑해줘요",
+       "이 꽃 길 따라 잠시 쉬어가다가", "그 자리 그곳에서 날 기다려요",
+      "그땐 참 좋았는데 말이야", "너와 함께할 수만 있다면", "때론 외롭고 슬퍼도 말이야",
+      "너와 같이 할 수만 있다면", "많이 울기도 했지만 웃은 일도 많아",
+      "내 머릿속 안에는 추억이 너무 많아", "이 또한 지나갈 테니까", "이 다음에 만나요 꽃이 피면",
+      "1년 365 이 세상 하나뿐인",  "넌 내 음악의 Motive 날 일깨워주는 은인",
+      "네 커다란 꽃밭에 기대어 막 떠오르던 가사말", "아직도 참 생생해 빠담빠담",
+      "너란 만개 한 꽃의 색은 100000 개",  "무한대 거대한 울림 Vivaldi의 사계",
+      "아직도 그댄 내 맘에 담을 수 없는 그림", "내 눈을 의심하지 You are my Magical Queen",
+      "떠나려거든 보내 드리오리다", "님이 가시는 길에 꽃을 뿌리오리다", "그리워지면 돌아와 줘요", "그때 또 다시 날 사랑해줘요",
+       "이 꽃 길 따라 잠시 쉬어가다가", "그 자리 그곳에서 날 기다려요",
+       "꽃 잎 따다 입을 맞추죠 얼굴은 빨개지고", "꽃 길을 깔아 준비를 하죠 그대가 오시는 길",
+       "그리워지면 돌아와 줘요", "그때 또 다시 날 사랑해줘요",
+       "이 꽃 길 따라 잠시 쉬어가다가", "그 자리 그곳에서 날 기다려요",
+       "꽃 잎 따다 입을 맞추죠 얼굴은 빨개지고", "꽃 길을 깔아 준비를 하죠",
+       "그 자리 그곳에서 날 기다려요"
+    ]
+  },
+  {
+    id:'FlowerFantasy',
+    title:'Flower Fantasy — N.Flying',
+    file:'Fantasy_Inst.mp3',
+    lyrics:[
+      "흩날려라 꽃잎들아", "널 떠올리지 못하게", "절벽 끝까지 피어라",
+      "날 위한 춤을 춰 주어서", "그대와 마주할 때면",
+      "나른한 계절이 돌아오죠", "마냥 따뜻하지는 않네요", "후회도 미련도 전혀 알 수 없게",
+      "아름답게 꾸미는 중이죠", "흩날려라 꽃잎들아", "널 떠올리지 못하게",
+      "절벽 끝까지 피어라", "날 위한 춤을 춰 주어서", "그대와 마주할 때면",
+      "꽃잎이 마구 떨어지던 풍경 속", "난생처음 보았던 아름답던", "호기심 가득한 네 모습이 보여", "그대도 지금 울고 있나요",
+      "그대도 떠나려는군요", "이유 없이 잡진 않을게요", "거짓된 믿음도 눈치챨 수 없게", "아름답게 속이는 중이죠",
+      "흩날려라 꽃잎들아", "널 떠올리지 못하게", "절벽 끝까지 피어라",
+      "누군가의 위로가 되어", "다시금 꿈꿀 수 있게",
+      "꽃잎이 마구 떨어지며 그대와", "다시금 추웠던 얼어붙은", "마음을 녹여 웃을 수 있을까요", "그대여 지금 듣고 있나요", "환하게 번지는 미소로",
+      "흩날려라 꽃잎들아", "널 떠올리지 못하게", "절벽 끝까지 피어라",
+      "날 위한 춤을 춰 주어서", "그대와 마주할 때면",
+      "꽃잎이 마구 떨어지던 풍경 속", "난생처음 보았던 아름답던", "호기심 가득한 네 모습이 보여", "그대도 지금 울고 있나요"
+    ]
+  },
+  {
+    id:'Spring',
+    title:'봄이 좋냐??(What The Spring??) — 10CM',
+    file:'10cm_Inst.mp3',
+    lyrics:[
+      "꽃이 언제 피는지", "그딴 게 뭐가 중요한데", "날씨가 언제 풀리는지", "그딴 거 알면 뭐할 건데", "추울 땐 춥다고 붙어있고", "더우면 덥다고 니네 진짜 이상해",
+      "너의 달콤한 남친은", "사실 피시방을 더", "가고 싶어하지 겁나 피곤하대",
+      "봄이 그렇게도 좋냐 멍청이들아", "벚꽃이 그렇게도 예쁘디 바보들아", "결국 꽃잎은 떨어지지", "니네도 떨어져라", "몽땅 망해라",
+      "아무 문제 없는데", "왜 나는 안 생기는 건데", "날씨도 완전 풀렸는데", "감기는 왜 또 걸리는데", "추울 땐 추워서 안 생기고", "더우면 더워서 인생은 불공평해",
+      "너의 완벽한 연애는", "아직 웃고 있지만", "너도 차일거야 겁나 지독하게",
+      "봄이 그렇게도 좋냐 멍청이들아", "벚꽃이 그렇게도 예쁘디 바보들아", "결국 꽃잎은 떨어지지", "니네도 떨어져라", "몽땅",
+      "손 잡지 마 팔짱 끼지 마", "끌어 안지 마", "제발 아무것도 하지 좀 마", "설레지 마 심쿵하지 마", "행복하지 마", "내 눈에 띄지 마",
+      "봄이 그렇게도 좋냐 멍청이들아", "벚꽃이 그렇게도 예쁘디 바보들아", "결국 꽃잎은 떨어지지", "니네도 떨어져라", "몽땅 망해라 망해라 망해라 망해라"
+    ]
+  },
+  {
+    id:'Blossom',
+    title:'벚꽃이 지면(When the Cherry Blossoms Fade) — I.O.I',
+    file:'I.O.I_Inst.mp3',
+    lyrics:[
+      "따사로운 햇살 밝게 비추고", "핑크빛만 돌던 봄도 끝나가",
+      "하나둘씩 떨어지던 예쁜 꽃잎을 보며", "네 맘도 조금조금씩 식어가면 어떡하나",
+      "소리 없이 끝나가는 우리들만의 봄을", "살포시 눈을 감고 끝나지 않길 기도하죠",
+      "벚꽃이 지면 우리 사랑은", "여름처럼 뜨거워질 수 있나요",
+      "우리의 시간이 조금 따뜻했다면", "이젠 좀 더 뜨겁게", "서로를 안아줘요",
+      "Ah 밝게 웃는 네 모습 좋아", "Ah 네가 웃으면 나도 좋아",
+      "하나둘씩 떨어지던 예쁜 꽃잎을 보며", "네 맘도 조금조금씩 식어가면 어떡하나",
+      "소리 없이 끝나가는 우리들만의 봄을", "살포시 눈을 감고 끝나지 않길 기도하죠",
+      "벚꽃이 지면 우리 사랑은", "여름처럼 뜨거워질 수 있나요",
+      "우리의 시간이 조금 따뜻했다면", "이젠 좀 더 뜸게",
+      "벚꽃이 지면 우리 사랑은", "여름처럼 뜨거워질 수 있나요",
+      "우리의 시간이 조금 따뜻했다면", "이젠 좀 더 뜨겁게", "서로를 안아줘요",
+      "떨어지더라도 우리는 하나라 기억하며", "예쁜 꽃잎을 바라봐",
+      "빛나는 불빛이 우릴 향해 비춰질 때까지", "하염없이 기다리나 봐",
+      "한 걸음 다시 한 걸음", "Getting better together as time goes by",
+      "벚꽃이 지면"
+    ]
+  },
+  {
+    id:'Flower',
+    title:'Flower — Miley Cyrus',
+    file:'Flower_Inst.mp3',
+    lyrics:[
+      "We were good we were gold", "Kind of dream that can't be sold",
+      "We were right 'til we weren't", "Built a home and watched it burn",
+      "Mmm I didn't wanna leave you", "I didn't wanna lie",
+      "Started to cry but then remembered I", "I can buy myself flowers",
+      "Write my name in the sand", "Talk to myself for hours",
+      "Say things you don't understand", "I can take myself dancing",
+      "And I can hold my own hand", "Yeah I can love me better than you can",
+      "Can love me better I can love me better baby",
+      "Can love me better I can love me better baby",
+      "Paint my nails cherry red", "Match the roses that you left",
+      "No remorse no regret", "I forget every word you said",
+      "Ooh I didn't wanna leave baby", "I didn't wanna fight",
+      "Started to cry but then remembered I", "I can buy myself flowers",
+      "Write my name in the sand", "Talk to myself for hours",
+      "Say things you don't understand", "I can take myself dancing",
+      "And I can hold my own hand", "Yeah I can love me better than you can",
+      "Can love me better I can love me better baby",
+      "Can love me better I can love me better baby",
+      "Can love me better I can love me better baby",
+      "Can love me better ooh I",
+      "I didn't wanna leave you I didn't wanna fight",
+      "Started to cry but then remembered I", "I can buy myself flowers",
+      "Write my name in the sand", "Talk to myself for hours",
+      "Say things you don't understand", "I can take myself dancing",
+      "And I can hold my own hand", "Yeah I can love me better than",
+      "Yeah I can love me better than you can", "Can I love me better",
+      "I can love me better baby", "Can I love me better",
+      "I can love me better baby", "Can I love me better",
+      "I can love me better baby", "Can I love me better I"
+    ]
+  }
+];
+
+/* 20색 팔레트*/
+const COLORS = [
+  "#111111","#6b6f76","#bfbfbf","#e6e6e6",
+  "#d0021b","#f5a623","#f8e71c","#8b572a",
+  "#7ed321","#417505","#4a90e2","#50e3c2",
+  "#9013fe","#bd10e0","#ff7f50","#ff69b4",
+  "#c0ffee","#a0d8ef","#3a3a3a","#000000"
+];
+
+/* ===== 엘리먼트 ===== */
+const player   = document.getElementById('player');
+const songList = document.getElementById('songList');
+const lyricsBox= document.getElementById('lyricsBox');
+const palette  = document.getElementById('palette');
+const canvas   = document.getElementById('canvas');
+const board    = document.getElementById('board');
+const gate     = document.getElementById('gate');
+const startBtn = document.getElementById('startBtn');
+const saveBtn  = document.getElementById('saveBtn');
+const clearBtn = document.getElementById('clearBtn');
+const handBtn  = document.getElementById('handBtn');          // ★ 추가
+const handHelp = document.getElementById('handHelp');          // ★ 추가
+const handCursor = document.getElementById('handCursor');      // ★ 추가
+
+/* 갤러리 */
+const gallery  = document.getElementById('gallery');
+const GKEY = 'bloom_gallery_v1';
+const GLIMIT = 24;
+
+/* 프리뷰 */
+const preview      = document.getElementById('preview');
+const previewImg   = document.getElementById('previewImg');
+const previewTitle = document.getElementById('previewTitle');
+const previewClose = document.getElementById('previewClose');
+const mSong = document.getElementById('mSong');
+const mCreated = document.getElementById('mCreated');
+const mWords = document.getElementById('mWords');
+const mSpm = document.getElementById('mSpm');
+const mPalette = document.getElementById('mPalette');
+const replayBtn = document.getElementById('replayBtn');
+const replayCanvas = document.getElementById('replayCanvas');
+const rctx = replayCanvas.getContext('2d');
+
+/* 오디오(루프 재생) */
+let actx;
+async function ensureAudioStart(){
+  try{
+    if (!player.src) loadSong(SONGS[0]);
+    if (!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    if (actx.state !== 'running') await actx.resume();
+    player.volume = 1.0;
+    await player.play();
+    gate?.remove();
+  }catch(e){ console.log('play blocked, try again', e); }
+}
+gate.addEventListener('click', ensureAudioStart);
+document.addEventListener('keydown', e=>{
+  if (gate && (e.key || e.code)) ensureAudioStart();
+});
+startBtn.addEventListener('click', ensureAudioStart);
+
+/* 사이드바 */
+let currentSong = SONGS[0];
+let currentInk  = COLORS[0];
+
+function renderSongs(){
+  songList.innerHTML = '';
+  SONGS.forEach(s=>{
+    const btn = document.createElement('button');
+    btn.className = 'song-btn' + (s.id===currentSong.id?' active':'');
+    btn.textContent = s.title;
+    btn.onclick = ()=>{
+      document.querySelectorAll('.song-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      loadSong(s);
+      ensureAudioStart();
+    };
+    songList.appendChild(btn);
+  });
+}
+function loadSong(s){
+  currentSong = s;
+  player.src = s.file;
+  player.loop = true;
+  renderLyrics(s.lyrics);
+  wordPool = s.lyrics.join(' ').split(/\s+/).filter(Boolean);
+  wordIdx = 0;
+}
+function renderLyrics(lines){
+  lyricsBox.innerHTML = '';
+  lines.forEach(line=>{
+    const div = document.createElement('div');
+    div.textContent = line;
+    lyricsBox.appendChild(div);
+  });
+}
+
+function renderPalette(){
+  palette.innerHTML = '';
+  COLORS.forEach((c,i)=>{
+    const sw = document.createElement('button');
+    sw.className = 'swatch' + (i===0?' selected':'');
+    sw.style.background = c;
+    sw.title = c;
+    sw.setAttribute('aria-label', `color ${c}`);
+    sw.onclick = ()=>{
+      document.querySelectorAll('.swatch').forEach(el=>el.classList.remove('selected'));
+      sw.classList.add('selected');
+      currentInk = c;
+      session.colors.add(c);
+    };
+    palette.appendChild(sw);
+  });
+}
+
+/* 드로잉(캔버스) + 세션 기록 */
+const ctx = canvas.getContext('2d');
+let drawing = false;
+let lastX=0, lastY=0;
+let wordPool = currentSong.lyrics.join(' ').split(/\s+/).filter(Boolean);
+let wordIdx = 0;
+
+/* 현재 드로잉 세션(저장 단위) */
+let session = resetSession();
+function resetSession(){
+  return {
+    start:null,
+    stamps:0,
+    times:[],
+    colors:new Set(),
+    events:[],
+    boardW:0, boardH:0
+  };
+}
+
+function resizeCanvas(){
+  const rect = board.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width  = Math.floor(rect.width  * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  canvas.style.width  = rect.width+'px';
+  canvas.style.height = rect.height+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.textBaseline = 'middle';
+  ctx.font = '12px "Noto Sans KR", sans-serif';
+  session.boardW = rect.width;
+  session.boardH = rect.height;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+/* 캔버스 좌표 */
+function getPos(e){
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX ?? (e.touches?.[0]?.clientX)) - r.left;
+  const y = (e.clientY ?? (e.touches?.[0]?.clientY)) - r.top;
+  return {x,y};
+}
+
+/* 단어 스탬프 */
+function stampWord(x, y){
+  if (!wordPool.length) return;
+  const w = wordPool[wordIdx % wordPool.length];
+  wordIdx++;
+  if (!session.start) session.start = Date.now();
+  const time = Date.now();
+  ctx.fillStyle = currentInk;
+  const angle = (Math.random()*6 - 3) * Math.PI/180;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillText(w, 0, 0);
+  ctx.restore();
+  session.stamps++;
+  session.times.push(time);
+  session.colors.add(currentInk);
+  session.events.push({x,y,word:w,color:currentInk,angle,time});
+}
+
+/* 마우스/터치 드로잉 */
+function onDown(e){
+  e.preventDefault();
+  drawing = true;
+  const {x,y} = getPos(e);
+  lastX=x; lastY=y;
+  stampWord(x,y);
+}
+function onMove(e){
+  if(!drawing) return;
+  const {x,y} = getPos(e);
+  const dx=x-lastX, dy=y-lastY;
+  const dist=Math.hypot(dx,dy);
+  if (dist>18){
+    stampWord(x,y);
+    lastX=x; lastY=y;
+  }
+}
+function onUp(){ drawing=false; }
+
+canvas.addEventListener('mousedown', onDown);
+canvas.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+canvas.addEventListener('touchstart', onDown, {passive:false});
+canvas.addEventListener('touchmove',  onMove, {passive:false});
+window.addEventListener('touchend',   onUp);
+
+/* 프리뷰 패널 */
+function openPreviewItem(item){
+  previewTitle.textContent = item.title || 'Saved Drawing';
+  previewImg.src = item.url;
+  mSong.textContent = item.title || '-';
+  mCreated.textContent = item.createdAt || '-';
+  mWords.textContent = (item.words!=null ? item.words : '-') + '';
+  mSpm.textContent = (item.spm!=null ? item.spm.toFixed ? item.spm.toFixed(1) : item.spm : '-') + '';
+  mPalette.innerHTML = '';
+  const cols = item.palette || [];
+  cols.forEach(c=>{
+    const dot = document.createElement('span');
+    dot.className='chip';
+    dot.style.background = c;
+    mPalette.appendChild(dot);
+  });
+  replayBtn.disabled = !(item.events && item.boardW && item.boardH);
+  replayBtn.onclick = ()=> startReplay(item);
+  preview.classList.add('show');
+  preview.setAttribute('aria-hidden','false');
+}
+function closePreview(){
+  preview.classList.remove('show');
+  preview.setAttribute('aria-hidden','true');
+  previewImg.removeAttribute('src');
+  stopReplay();
+}
+previewClose.addEventListener('click', closePreview);
+
+/* 갤러리 저장/복원 */
+function addToGalleryItem(item){
+  const img = document.createElement('img');
+  img.className = 'thumb';
+  img.src = item.url;
+  img.alt = 'saved drawing';
+  img.onclick = ()=> openPreviewItem(item);
+  gallery.appendChild(img);
+}
+function addToGallery(url){
+  const createdAt = new Date().toLocaleString('ko-KR');
+  let spm = 0;
+  if (session.start && session.times.length > 1){
+    const durMs = session.times[session.times.length-1] - session.times[0];
+    const min = Math.max(0.001, durMs/60000);
+    spm = session.stamps / min;
+  }
+  const paletteUsed = Array.from(session.colors).slice(0,5);
+  const item = {
+    url,
+    title: currentSong.title,
+    createdAt,
+    words: session.stamps,
+    spm,
+    palette: paletteUsed,
+    events: session.events,
+    boardW: session.boardW,
+    boardH: session.boardH
+  };
+  addToGalleryItem(item);
+  try{
+    const list = JSON.parse(localStorage.getItem(GKEY) || '[]');
+    list.push(item);
+    while(list.length > GLIMIT) list.shift();
+    localStorage.setItem(GKEY, JSON.stringify(list));
+  }catch(_){}
+  session = resetSession();
+  const rect = board.getBoundingClientRect();
+  session.boardW = rect.width; session.boardH = rect.height;
+}
+function restoreGallery(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(GKEY) || '[]');
+    raw.forEach(item=>{
+      if (typeof item === 'string'){
+        addToGalleryItem({url:item, title:'Saved Drawing'});
+      }else{
+        addToGalleryItem(item);
+      }
+    });
+  }catch(_){}
+}
+
+/* 저장/지우기 */
+saveBtn.addEventListener('click', ()=>{
+  const w = canvas.width, h = canvas.height;
+  const tmp = document.createElement('canvas');
+  tmp.width = w; tmp.height = h;
+  const tctx = tmp.getContext('2d');
+  tctx.fillStyle = '#ffffff';
+  tctx.fillRect(0,0,w,h);
+  tctx.drawImage(canvas, 0, 0);
+  const url = tmp.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'blooming_type.png';
+  a.click();
+  addToGallery(url);
+});
+clearBtn.addEventListener('click', ()=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  session = resetSession();
+  const rect = board.getBoundingClientRect();
+  session.boardW = rect.width; session.boardH = rect.height;
+});
+
+/* Replay(프리뷰 내부) */
+let replayRAF = null;
+function fitReplayCanvas(w, h){
+  const rect = replayCanvas.getBoundingClientRect();
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  replayCanvas.width  = Math.floor(rect.width * dpr);
+  replayCanvas.height = Math.floor(rect.height * dpr);
+  rctx.setTransform(dpr,0,0,dpr,0,0);
+  rctx.fillStyle = '#ffffff';
+  rctx.fillRect(0,0,rect.width,rect.height);
+  rctx.textBaseline = 'middle';
+  const scale = Math.min(rect.width / w, rect.height / h);
+  return {scale, cssW:rect.width, cssH:rect.height};
+}
+function startReplay(item){
+  stopReplay();
+  const hasEvents = item.events && item.events.length>0 && item.boardW && item.boardH;
+  if(!hasEvents) return;
+  const {scale} = fitReplayCanvas(item.boardW, item.boardH);
+  const evts = item.events;
+  const replayFontPx = Math.max(3, Math.round(12 * Math.min(1, scale * 0.5)));
+  rctx.textBaseline = 'middle';
+  rctx.font = `${replayFontPx}px "Noto Sans KR", sans-serif`;
+  let totalMs = 0;
+  if (evts.length>1){
+    totalMs = (evts[evts.length-1].time - evts[0].time);
+  }
+  const targetDur = 6000;
+  const speed = totalMs>0 ? (targetDur/totalMs) : 1;
+  const r = replayCanvas.getBoundingClientRect();
+  rctx.fillStyle = '#ffffff';
+  rctx.fillRect(0,0,r.width,r.height);
+  let i=0;
+  let startT = performance.now();
+  function step(now){
+    const elapsed = now - startT;
+    const virtualTime = evts[0].time + elapsed/ speed;
+    while(i<evts.length && evts[i].time <= virtualTime){
+      const e = evts[i];
+      rctx.save();
+      rctx.translate(e.x*scale, e.y*scale);
+      rctx.rotate(e.angle || 0);
+      rctx.fillStyle = e.color || '#111';
+      rctx.fillText(e.word || '', 0, 0);
+      rctx.restore();
+      i++;
+    }
+    if (i<evts.length){
+      replayRAF = requestAnimationFrame(step);
+    }else{
+      replayRAF = null;
+    }
+  }
+  replayRAF = requestAnimationFrame(step);
+}
+function stopReplay(){
+  if (replayRAF){ cancelAnimationFrame(replayRAF); replayRAF=null; }
+  const rect = replayCanvas.getBoundingClientRect();
+  rctx.clearRect(0,0,rect.width,rect.height);
+}
+
+
+const video = document.createElement('video');
+video.id = 'handVideo';
+video.playsInline = true;
+document.body.appendChild(video);
+
+let hands = null;
+let camera = null;
+let handOn = false;
+let pinchDrawing = false;
+let lastHX = null, lastHY = null;
+
+
+function setHandCursor(x, y, visible){
+  if(!handCursor) return;
+  if(visible){
+    handCursor.style.left = x + 'px';
+    handCursor.style.top  = y + 'px';
+    handCursor.classList.add('show');
+  }else{
+    handCursor.classList.remove('show');
+  }
+}
+
+/* normalized(0~1) → 캔버스 좌표 */
+function normToCanvas(nx, ny){
+  const rect = canvas.getBoundingClientRect();
+  return { x: nx * rect.width, y: ny * rect.height };
+}
+
+/* 핀치 판정: 엄지(4)–검지(8) 거리 / 손폭(5–17) */
+function isPinching(lm){
+  const t = lm[4], i = lm[8];
+  const d = Math.hypot(t.x - i.x, t.y - i.y);
+  const base = Math.hypot(lm[5].x - lm[17].x, lm[5].y - lm[17].y) + 1e-6;
+  return (d / base) < 0.45; 
+}
+
+/* 손 결과 콜백 */
+function onHandResults(results){
+  if (!handOn) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length===0){
+    setHandCursor(0,0,false);
+    pinchDrawing = false;
+    lastHX = lastHY = null;
+    return;
+  }
+  const lm = results.multiHandLandmarks[0];
+  // selfieMode=true 
+  const idx = lm[8];
+  // 캔버스 상대 좌표 변환
+  const {x,y} = normToCanvas(idx.x, idx.y);
+  // 포인터 점
+  setHandCursor(x, y, true);
+
+  
+  const alpha = 0.35;
+  const smX = (lastHX==null)? x : lastHX*(1-alpha)+x*alpha;
+  const smY = (lastHY==null)? y : lastHY*(1-alpha)+y*alpha;
+  lastHX = smX; lastHY = smY;
+
+  const pinched = isPinching(lm);
+
+  if (pinched && !pinchDrawing){
+    
+    pinchDrawing = true;
+    stampWord(smX, smY);
+    handCursor.style.borderWidth = '2px';
+    handCursor.style.transform = 'translate(-50%,-50%) scale(1.2)';
+  }else if (pinched && pinchDrawing){
+    
+    const dx = smX - lastX, dy = smY - lastY;
+    const dist = Math.hypot(dx,dy);
+    if (dist > 18){
+      stampWord(smX, smY);
+      lastX = smX; lastY = smY;
+    }
+  }else{
+    
+    pinchDrawing = false;
+    handCursor.style.borderWidth = '1px';
+    handCursor.style.transform = 'translate(-50%,-50%) scale(1)';
+    
+    lastX = smX; lastY = smY;
+  }
+}
+
+
+async function enableHand(){
+  if (handOn) return;
+  handOn = true;
+  handBtn.setAttribute('aria-pressed','true');
+  handHelp.hidden = false;
+
+  // 권한 요청 및 비디오 시작
+  if (!video.srcObject){
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:640, height:480}, audio:false});
+    video.srcObject = stream;
+    await video.play();
+  }
+
+  if (!hands){
+    hands = new Hands({locateFile: (file)=> `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({
+      selfieMode: true,
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.65,
+      minTrackingConfidence: 0.55
+    });
+    hands.onResults(onHandResults);
+  }
+
+  if (!camera){
+    camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({image: video});
+      },
+      width: 640,
+      height: 480
+    });
+  }
+  camera.start();
+}
+
+
+function disableHand(){
+  if (!handOn) return;
+  handOn = false;
+  handBtn.setAttribute('aria-pressed','false');
+  handHelp.hidden = true;
+  setHandCursor(0,0,false);
+  pinchDrawing = false;
+  lastHX = lastHY = null;
+  if (camera){ camera.stop(); }
+  
+}
+
+handBtn.addEventListener('click', ()=>{
+  if (handOn) disableHand(); else enableHand();
+});
+
+
+renderSongs();
+renderPalette();
+loadSong(SONGS[0]);
+restoreGallery();
+
+const initRect = board.getBoundingClientRect();
+session.boardW = initRect.width; session.boardH = initRect.height;
+</script>
+</body>
+</html>
