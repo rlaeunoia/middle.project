@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Blooming Type — Typographic Garden</title>
 
-
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400&display=swap" rel="stylesheet" />
 
 <style>
@@ -26,11 +25,11 @@
     margin:0; background:var(--bg); color:var(--fg);
     font-family:'Noto Sans KR', system-ui, -apple-system, sans-serif;
     font-size:var(--fs); line-height:var(--lh);
-    overflow:hidden;  /* 스크롤 금지 */
+    overflow:hidden;  
     letter-spacing:0.01em;
   }
 
-  /* 4칼럼 그리드: 1 = 컨트롤, 2~4 = 드로잉 */
+  
   .page{
     height:100vh;
     display:grid;
@@ -41,7 +40,6 @@
     box-sizing:border-box;
   }
 
-  
   .folio{
     grid-column: 1 / -1;
     display:flex; justify-content:space-between; align-items:flex-start;
@@ -50,12 +48,12 @@
     user-select:none;
   }
 
-  /* 사이드바(1칼럼) */
+  
   .sidebar{
     grid-column: 1 / 2;
     grid-row: 2 / 3;
     display:flex; flex-direction:column; gap:12px;
-    min-width:0; /* 텍스트 줄바꿈 안전 */
+    min-width:0;
   }
 
   .title{ color:var(--fg); letter-spacing:.02em; }
@@ -72,7 +70,7 @@
   .song-btn.active{ text-decoration:underline; text-underline-offset:2px; }
 
   .lyrics{
-    max-height:28vh; overflow:auto; /* 사이드에서만 스크롤 허용(페이지는 고정) */
+    max-height:28vh; overflow:auto;
     padding-right:4px;
   }
   .lyrics::-webkit-scrollbar{ width:4px; }
@@ -97,12 +95,12 @@
   }
   .btn:hover{ background:#f5f5f5; }
 
-  /* 드로잉 보드(3칼럼)*/
+  
   .board{
     grid-column: 2 / -1; grid-row: 2 / 3;
     position:relative; min-width:0;
-    border-left:1px solid var(--line); /* 구분선 */
-    padding-left: calc(var(--gap) - 1px); 
+    border-left:1px solid var(--line);
+    padding-left: calc(var(--gap) - 1px);
   }
 
   canvas{
@@ -111,14 +109,14 @@
     background:transparent;
   }
 
-  /* 시작 오버레이(오토플레이 정책 대응) */
+  
   .gate{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     background:rgba(255,255,255,.94); color:#111; z-index:5;
   }
   .gate .box{ border:1px solid #111; padding:8px 10px; cursor:pointer; user-select:none; }
 
-  /* 하단 갤러리 바*/
+  
   .gallery-bar{
     position:absolute; left:0; right:0; bottom:0; height:96px;
     display:flex; gap:8px; align-items:center;
@@ -138,12 +136,12 @@
   .gallery-bar::-webkit-scrollbar{ height:6px; }
   .gallery-bar::-webkit-scrollbar-thumb{ background:#ccc; }
 
-  /* 오른쪽 1칼럼 프리뷰 패널*/
+  
   .preview{
-    position:absolute; top:0; right:0; bottom:96px; /* 하단 갤러리 높이만큼 띄움 */
-    width:33.3333%;   /* 보드(2~4) 중 오른쪽 1칼럼 */
+    position:absolute; top:0; right:0; bottom:96px;
+    width:33.3333%;
     min-width:220px;
-    background: var(--bg);             
+    background: var(--bg);
     border-left:1px solid var(--line);
     display:none;
     z-index:3;
@@ -182,12 +180,38 @@
   .replay-wrap{ border-top:1px solid var(--line); padding-top:6px; }
   #replayCanvas{ width:100%; height:180px; background:#fff; border:1px solid var(--line); }
 
-  /* 작은 텍스트 버튼 */
+  
   .btn-link{
     appearance:none; background:transparent; border:1px solid var(--ui);
     padding:2px 6px; cursor:pointer; color:var(--fg);
   }
   .btn-link:hover{ background:#f5f5f5; }
+
+  /* === Hand(핀치) 추가: 포인터 점 + 도움말 === */
+  .hand-cursor{
+    position:absolute; left:0; top:0;
+    width:10px; height:10px;
+    border:1px solid var(--fg);
+    border-radius:50%;
+    background:transparent;
+    box-shadow:0 0 0 2px #fff inset;
+    pointer-events:none;
+    transform:translate(-50%, -50%);
+    opacity:0; transition:opacity .15s;
+    z-index:6;
+  }
+  .hand-cursor.show{ opacity:1; }
+
+  .hand-help{
+    color:var(--muted);
+    font-size:var(--fs);
+    line-height:var(--lh);
+  }
+  .hand-help .tips{ margin:6px 0 0 0; padding:0 0 0 12px; }
+  .hand-help .tips li{ margin:2px 0; }
+
+  
+  #handVideo{ position:absolute; left:-99999px; width:0; height:0; }
 </style>
 </head>
 <body>
@@ -220,12 +244,29 @@
       <button class="btn" id="saveBtn">Save PNG</button>
       <button class="btn" id="clearBtn">Clear</button>
       <button class="btn" id="startBtn">Start</button>
+      <!-- ★ 추가: Hand 토글 버튼 -->
+      <button class="btn" id="handBtn" aria-pressed="false">Hand</button>
+    </div>
+
+    <!-- ★ 추가: Hand 사용법(Hand ON일 때만 표시) -->
+    <div class="thinline"></div>
+    <div id="handHelp" class="hand-help" hidden>
+      <div class="section">Hand Pinch — How to</div>
+      <ul class="tips">
+        <li>엄지+검지를 붙이면 단어가 찍혀요.</li>
+        <li>핀치한 채로 손가락을 움직이면 선처럼 이어져요.</li>
+        <li>색을 바꾸면 그 다음 스탬프부터 새 색이 적용돼요.</li>
+        <li>끄려면 Hand 버튼을 다시 누르세요.</li>
+      </ul>
     </div>
   </aside>
 
   <!-- 3칼럼: 드로잉 보드 -->
   <section class="board" id="board">
     <canvas id="canvas"></canvas>
+    <!-- 레이저 포인터 도트 -->
+    <div id="handCursor" class="hand-cursor" aria-hidden="true"></div>
+
     <div class="gate" id="gate"><div class="box">CLICK / TAP / KEY — Start To Make My Own Flower</div></div>
 
     <!-- 저장 썸네일 갤러리 바 -->
@@ -265,6 +306,10 @@
 
 <!-- 오디오 루프 -->
 <audio id="player" preload="auto" loop playsinline></audio>
+
+<!-- ★ 추가: MediaPipe Hands & Camera utils -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
 <script>
 
@@ -426,7 +471,7 @@ const COLORS = [
   "#c0ffee","#a0d8ef","#3a3a3a","#000000"
 ];
 
-
+/* ===== 엘리먼트 ===== */
 const player   = document.getElementById('player');
 const songList = document.getElementById('songList');
 const lyricsBox= document.getElementById('lyricsBox');
@@ -437,24 +482,25 @@ const gate     = document.getElementById('gate');
 const startBtn = document.getElementById('startBtn');
 const saveBtn  = document.getElementById('saveBtn');
 const clearBtn = document.getElementById('clearBtn');
+const handBtn  = document.getElementById('handBtn');          // ★ 추가
+const handHelp = document.getElementById('handHelp');          // ★ 추가
+const handCursor = document.getElementById('handCursor');      // ★ 추가
 
-/* 갤러리 요소 & 저장설정 */
+/* 갤러리 */
 const gallery  = document.getElementById('gallery');
 const GKEY = 'bloom_gallery_v1';
 const GLIMIT = 24;
 
-/* 프리뷰 패널 요소 */
+/* 프리뷰 */
 const preview      = document.getElementById('preview');
 const previewImg   = document.getElementById('previewImg');
 const previewTitle = document.getElementById('previewTitle');
 const previewClose = document.getElementById('previewClose');
-/* 메타 */
 const mSong = document.getElementById('mSong');
 const mCreated = document.getElementById('mCreated');
 const mWords = document.getElementById('mWords');
 const mSpm = document.getElementById('mSpm');
 const mPalette = document.getElementById('mPalette');
-/* Replay */
 const replayBtn = document.getElementById('replayBtn');
 const replayCanvas = document.getElementById('replayCanvas');
 const rctx = replayCanvas.getContext('2d');
@@ -501,7 +547,6 @@ function loadSong(s){
   player.src = s.file;
   player.loop = true;
   renderLyrics(s.lyrics);
-  
   wordPool = s.lyrics.join(' ').split(/\s+/).filter(Boolean);
   wordIdx = 0;
 }
@@ -525,9 +570,7 @@ function renderPalette(){
     sw.onclick = ()=>{
       document.querySelectorAll('.swatch').forEach(el=>el.classList.remove('selected'));
       sw.classList.add('selected');
-      // 이후 드로잉부터 이 색을 사용
       currentInk = c;
-      // 세션 팔레트 기록
       session.colors.add(c);
     };
     palette.appendChild(sw);
@@ -547,26 +590,23 @@ function resetSession(){
   return {
     start:null,
     stamps:0,
-    times:[],          
-    colors:new Set(),  
-    events:[],         
-    boardW:0, boardH:0 
+    times:[],
+    colors:new Set(),
+    events:[],
+    boardW:0, boardH:0
   };
 }
 
 function resizeCanvas(){
-  // 보드 영역 채우기
   const rect = board.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   canvas.width  = Math.floor(rect.width  * dpr);
   canvas.height = Math.floor(rect.height * dpr);
   canvas.style.width  = rect.width+'px';
   canvas.style.height = rect.height+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0); 
-  
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.textBaseline = 'middle';
   ctx.font = '12px "Noto Sans KR", sans-serif';
-  
   session.boardW = rect.width;
   session.boardH = rect.height;
 }
@@ -581,45 +621,40 @@ function getPos(e){
   return {x,y};
 }
 
-
+/* 단어 스탬프 */
 function stampWord(x, y){
   if (!wordPool.length) return;
   const w = wordPool[wordIdx % wordPool.length];
   wordIdx++;
-
   if (!session.start) session.start = Date.now();
   const time = Date.now();
-
   ctx.fillStyle = currentInk;
-  
-  const angle = (Math.random()*6 - 3) * Math.PI/180; 
+  const angle = (Math.random()*6 - 3) * Math.PI/180;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
   ctx.fillText(w, 0, 0);
   ctx.restore();
-
   session.stamps++;
   session.times.push(time);
   session.colors.add(currentInk);
   session.events.push({x,y,word:w,color:currentInk,angle,time});
 }
 
-/* 드래그/클릭 인터랙션 */
+/* 마우스/터치 드로잉 */
 function onDown(e){
   e.preventDefault();
   drawing = true;
   const {x,y} = getPos(e);
   lastX=x; lastY=y;
-  stampWord(x,y); 
+  stampWord(x,y);
 }
 function onMove(e){
   if(!drawing) return;
   const {x,y} = getPos(e);
-  
   const dx=x-lastX, dy=y-lastY;
   const dist=Math.hypot(dx,dy);
-  if (dist>18){ 
+  if (dist>18){
     stampWord(x,y);
     lastX=x; lastY=y;
   }
@@ -629,11 +664,9 @@ function onUp(){ drawing=false; }
 canvas.addEventListener('mousedown', onDown);
 canvas.addEventListener('mousemove', onMove);
 window.addEventListener('mouseup', onUp);
-
 canvas.addEventListener('touchstart', onDown, {passive:false});
 canvas.addEventListener('touchmove',  onMove, {passive:false});
 window.addEventListener('touchend',   onUp);
-
 
 /* 프리뷰 패널 */
 function openPreviewItem(item){
@@ -643,8 +676,6 @@ function openPreviewItem(item){
   mCreated.textContent = item.createdAt || '-';
   mWords.textContent = (item.words!=null ? item.words : '-') + '';
   mSpm.textContent = (item.spm!=null ? item.spm.toFixed ? item.spm.toFixed(1) : item.spm : '-') + '';
-
-  // 팔레트 칩
   mPalette.innerHTML = '';
   const cols = item.palette || [];
   cols.forEach(c=>{
@@ -653,11 +684,8 @@ function openPreviewItem(item){
     dot.style.background = c;
     mPalette.appendChild(dot);
   });
-
-  // 리플레이 데이터 보유 여부
   replayBtn.disabled = !(item.events && item.boardW && item.boardH);
   replayBtn.onclick = ()=> startReplay(item);
-
   preview.classList.add('show');
   preview.setAttribute('aria-hidden','false');
 }
@@ -687,7 +715,6 @@ function addToGallery(url){
     spm = session.stamps / min;
   }
   const paletteUsed = Array.from(session.colors).slice(0,5);
-
   const item = {
     url,
     title: currentSong.title,
@@ -695,25 +722,18 @@ function addToGallery(url){
     words: session.stamps,
     spm,
     palette: paletteUsed,
-    events: session.events,      
+    events: session.events,
     boardW: session.boardW,
     boardH: session.boardH
   };
-
-  
   addToGalleryItem(item);
-
-  // localStorage
   try{
     const list = JSON.parse(localStorage.getItem(GKEY) || '[]');
     list.push(item);
     while(list.length > GLIMIT) list.shift();
     localStorage.setItem(GKEY, JSON.stringify(list));
   }catch(_){}
-
-  // 새 세션으로 리셋
   session = resetSession();
-  // 보드 크기 재기록
   const rect = board.getBoundingClientRect();
   session.boardW = rect.width; session.boardH = rect.height;
 }
@@ -722,7 +742,6 @@ function restoreGallery(){
     const raw = JSON.parse(localStorage.getItem(GKEY) || '[]');
     raw.forEach(item=>{
       if (typeof item === 'string'){
-        // 예전 포맷(이미지 URL만): 최소 메타 보완
         addToGalleryItem({url:item, title:'Saved Drawing'});
       }else{
         addToGalleryItem(item);
@@ -733,37 +752,30 @@ function restoreGallery(){
 
 /* 저장/지우기 */
 saveBtn.addEventListener('click', ()=>{
-  // 흰 배경 합성 저장 + 갤러리 추가
   const w = canvas.width, h = canvas.height;
   const tmp = document.createElement('canvas');
   tmp.width = w; tmp.height = h;
   const tctx = tmp.getContext('2d');
-
   tctx.fillStyle = '#ffffff';
   tctx.fillRect(0,0,w,h);
   tctx.drawImage(canvas, 0, 0);
-
   const url = tmp.toDataURL('image/png');
-
   const a = document.createElement('a');
   a.href = url;
   a.download = 'blooming_type.png';
   a.click();
-
   addToGallery(url);
 });
 clearBtn.addEventListener('click', ()=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  
   session = resetSession();
   const rect = board.getBoundingClientRect();
   session.boardW = rect.width; session.boardH = rect.height;
 });
 
-/* Replay 구현(프리뷰 내부 캔버스) */
+/* Replay(프리뷰 내부) */
 let replayRAF = null;
 function fitReplayCanvas(w, h){
-  
   const rect = replayCanvas.getBoundingClientRect();
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   replayCanvas.width  = Math.floor(rect.width * dpr);
@@ -772,7 +784,6 @@ function fitReplayCanvas(w, h){
   rctx.fillStyle = '#ffffff';
   rctx.fillRect(0,0,rect.width,rect.height);
   rctx.textBaseline = 'middle';
-  
   const scale = Math.min(rect.width / w, rect.height / h);
   return {scale, cssW:rect.width, cssH:rect.height};
 }
@@ -780,35 +791,25 @@ function startReplay(item){
   stopReplay();
   const hasEvents = item.events && item.events.length>0 && item.boardW && item.boardH;
   if(!hasEvents) return;
-
   const {scale} = fitReplayCanvas(item.boardW, item.boardH);
   const evts = item.events;
-
-  /* 리플레이 전용 폰트 크기 축소*/
   const replayFontPx = Math.max(3, Math.round(12 * Math.min(1, scale * 0.5)));
   rctx.textBaseline = 'middle';
   rctx.font = `${replayFontPx}px "Noto Sans KR", sans-serif`;
-
-  // 전체 시간을 6초 안팎
   let totalMs = 0;
   if (evts.length>1){
     totalMs = (evts[evts.length-1].time - evts[0].time);
   }
-  const targetDur = 6000; 
+  const targetDur = 6000;
   const speed = totalMs>0 ? (targetDur/totalMs) : 1;
-
-  // 초기화
   const r = replayCanvas.getBoundingClientRect();
   rctx.fillStyle = '#ffffff';
   rctx.fillRect(0,0,r.width,r.height);
-
   let i=0;
   let startT = performance.now();
-
   function step(now){
     const elapsed = now - startT;
     const virtualTime = evts[0].time + elapsed/ speed;
-
     while(i<evts.length && evts[i].time <= virtualTime){
       const e = evts[i];
       rctx.save();
@@ -822,24 +823,165 @@ function startReplay(item){
     if (i<evts.length){
       replayRAF = requestAnimationFrame(step);
     }else{
-      replayRAF = null; // 끝
+      replayRAF = null;
     }
   }
   replayRAF = requestAnimationFrame(step);
 }
 function stopReplay(){
   if (replayRAF){ cancelAnimationFrame(replayRAF); replayRAF=null; }
-  // 캔버스 비움
   const rect = replayCanvas.getBoundingClientRect();
   rctx.clearRect(0,0,rect.width,rect.height);
 }
+
+
+const video = document.createElement('video');
+video.id = 'handVideo';
+video.playsInline = true;
+document.body.appendChild(video);
+
+let hands = null;
+let camera = null;
+let handOn = false;
+let pinchDrawing = false;
+let lastHX = null, lastHY = null;
+
+
+function setHandCursor(x, y, visible){
+  if(!handCursor) return;
+  if(visible){
+    handCursor.style.left = x + 'px';
+    handCursor.style.top  = y + 'px';
+    handCursor.classList.add('show');
+  }else{
+    handCursor.classList.remove('show');
+  }
+}
+
+/* normalized(0~1) → 캔버스 좌표 */
+function normToCanvas(nx, ny){
+  const rect = canvas.getBoundingClientRect();
+  return { x: nx * rect.width, y: ny * rect.height };
+}
+
+/* 핀치 판정: 엄지(4)–검지(8) 거리 / 손폭(5–17) */
+function isPinching(lm){
+  const t = lm[4], i = lm[8];
+  const d = Math.hypot(t.x - i.x, t.y - i.y);
+  const base = Math.hypot(lm[5].x - lm[17].x, lm[5].y - lm[17].y) + 1e-6;
+  return (d / base) < 0.45; 
+}
+
+/* 손 결과 콜백 */
+function onHandResults(results){
+  if (!handOn) return;
+  const rect = canvas.getBoundingClientRect();
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length===0){
+    setHandCursor(0,0,false);
+    pinchDrawing = false;
+    lastHX = lastHY = null;
+    return;
+  }
+  const lm = results.multiHandLandmarks[0];
+  // selfieMode=true 
+  const idx = lm[8];
+  // 캔버스 상대 좌표 변환
+  const {x,y} = normToCanvas(idx.x, idx.y);
+  // 포인터 점
+  setHandCursor(x, y, true);
+
+  
+  const alpha = 0.35;
+  const smX = (lastHX==null)? x : lastHX*(1-alpha)+x*alpha;
+  const smY = (lastHY==null)? y : lastHY*(1-alpha)+y*alpha;
+  lastHX = smX; lastHY = smY;
+
+  const pinched = isPinching(lm);
+
+  if (pinched && !pinchDrawing){
+    
+    pinchDrawing = true;
+    stampWord(smX, smY);
+    handCursor.style.borderWidth = '2px';
+    handCursor.style.transform = 'translate(-50%,-50%) scale(1.2)';
+  }else if (pinched && pinchDrawing){
+    
+    const dx = smX - lastX, dy = smY - lastY;
+    const dist = Math.hypot(dx,dy);
+    if (dist > 18){
+      stampWord(smX, smY);
+      lastX = smX; lastY = smY;
+    }
+  }else{
+    
+    pinchDrawing = false;
+    handCursor.style.borderWidth = '1px';
+    handCursor.style.transform = 'translate(-50%,-50%) scale(1)';
+    
+    lastX = smX; lastY = smY;
+  }
+}
+
+
+async function enableHand(){
+  if (handOn) return;
+  handOn = true;
+  handBtn.setAttribute('aria-pressed','true');
+  handHelp.hidden = false;
+
+  // 권한 요청 및 비디오 시작
+  if (!video.srcObject){
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user', width:640, height:480}, audio:false});
+    video.srcObject = stream;
+    await video.play();
+  }
+
+  if (!hands){
+    hands = new Hands({locateFile: (file)=> `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({
+      selfieMode: true,
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.65,
+      minTrackingConfidence: 0.55
+    });
+    hands.onResults(onHandResults);
+  }
+
+  if (!camera){
+    camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({image: video});
+      },
+      width: 640,
+      height: 480
+    });
+  }
+  camera.start();
+}
+
+
+function disableHand(){
+  if (!handOn) return;
+  handOn = false;
+  handBtn.setAttribute('aria-pressed','false');
+  handHelp.hidden = true;
+  setHandCursor(0,0,false);
+  pinchDrawing = false;
+  lastHX = lastHY = null;
+  if (camera){ camera.stop(); }
+  
+}
+
+handBtn.addEventListener('click', ()=>{
+  if (handOn) disableHand(); else enableHand();
+});
 
 
 renderSongs();
 renderPalette();
 loadSong(SONGS[0]);
 restoreGallery();
-
 
 const initRect = board.getBoundingClientRect();
 session.boardW = initRect.width; session.boardH = initRect.height;
